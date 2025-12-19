@@ -1,12 +1,12 @@
-
 import streamlit as st
-import openai
+from openai import OpenAI
 import os
 
 # =========================
 # OpenAI Setup
 # =========================
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 
 # =========================
 # App Config
@@ -358,5 +358,6 @@ st.markdown(
     "⚠️ This AI assistant is for **educational purposes only**. "
     "Always follow hospital protocols and verify with pharmacology manuals."
 )
+
 
 
