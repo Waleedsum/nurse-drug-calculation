@@ -1,11 +1,14 @@
+
 import streamlit as st
 from openai import OpenAI
 import os
 
-# =========================
+
 # OpenAI Setup
 # =========================
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai = client   # ✅ FIX: allows openai.ChatCompletion.create() to work
+
 
 
 # =========================
@@ -52,7 +55,7 @@ drug_tips = {
 }
 
 # =========================
-# AI Functions
+# AI Functions (fixed)
 # =========================
 def ask_ai(drug, result, tip, calculation_type):
     prompt = f"""
@@ -65,12 +68,13 @@ Explain clearly how this result is interpreted clinically.
 Mention safety considerations.
 Do NOT use formulas or code.
 """
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0
     )
-    return response["choices"][0]["message"]["content"]
+    return response.choices[0].message.content
+
 
 def generate_med_policy(drug_name):
     prompt = f"""
@@ -83,12 +87,13 @@ Include:
 - Monitoring
 Do NOT provide dose calculations.
 """
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0
     )
-    return response["choices"][0]["message"]["content"]
+    return response.choices[0].message.content
+
 
 # =========================
 # Calculation Engine
@@ -124,65 +129,6 @@ def calculate_iv_pump(volume, time_hours):
     return volume / time_hours if time_hours > 0 else None
 
 
-# Nurse Assistant Chat (BELOW RESULTS)
-# =========================
-st.markdown("---")
-st.markdown("## 🤖 Nurse Assistant Chat")
-
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-def is_greeting(text):
-    return text.strip().lower() in ["hi", "hello", "hey", "start"]
-
-with st.form(key="chat_form", clear_on_submit=True):
-    user_input = st.text_input(
-        "Type Hi to start, or medication name, or question and press Enter 👩‍🚀:",
-        key="chat_input"
-    )
-    submitted = st.form_submit_button("Send")
-
-if submitted and user_input:
-    st.session_state.chat_history.append(("user", user_input))
-
-    if is_greeting(user_input):
-        st.session_state.chat_history.append(
-            ("bot",
-             "👋 Hello Nurse!\n\n"
-             "I can explain medication policies.\n"
-             "👉 Type a medication name to continue.")
-        )
-    else:
-        tip = drug_tips.get(user_input.lower(), drug_tips["Caution"])
-        st.session_state.chat_history.append(
-            ("bot", f"🩺 Database Tip for **{user_input}**:\n{tip}")
-        )
-        policy = generate_med_policy(user_input)
-        st.session_state.chat_history.append(
-            ("bot", f"### 📄 Explain Medication Policy\n{policy}")
-        )
-
-# Display chat (scrollable, bottom-up)
-chat_html = """
-<div style='
-    max-height:400px;
-    overflow-y:auto;
-    border:1px solid #ddd;
-    padding:10px;
-    border-radius:10px;
-'>
-"""
-for role, msg in st.session_state.chat_history:
-    if role == "bot":
-        chat_html += f"<p><b>🤖 Bot:</b> {msg}</p>"
-    else:
-        chat_html += f"<p><b>👩‍⚕️ Nurse:</b> {msg}</p>"
-chat_html += "</div>"
-
-st.markdown(chat_html, unsafe_allow_html=True)
-
-
-
 # =========================
 # Tabs A–F
 # =========================
@@ -195,31 +141,92 @@ tabs = st.tabs([
     "F – IV rate Pump"
 ])
 
-# ---- Tabs A–F REMAIN UNCHANGED FROM YOUR VERSION ----
-# (Same exact logic, inputs, calculations, and AI buttons)
-
-
+# ---- Tabs A–F
 # --- Tab A – ICU Infusions ---
 with tabs[0]:
     st.header("A – ICU Infusions")
     if "selected_drug" not in st.session_state:
         st.session_state.selected_drug = None
-    with st.expander("💊 Select a drug"):
-        all_drugs = list(DRUGS.keys()) + ["Other"]
-        cols_per_row = 4
-        for i in range(0, len(all_drugs), cols_per_row):
-            cols = st.columns(cols_per_row, gap="large")
-            for j, drug in enumerate(all_drugs[i:i + cols_per_row]):
-                icon = "🔴" if drug in TIME_MANDATORY_DRUGS else "🟢" if DRUGS.get(drug, {}).get("type")=="sedative" else "🔵" if DRUGS.get(drug, {}).get("type")=="muscle_relaxant" else "✨"
-                prefix = "✅ " if st.session_state.selected_drug==drug else ""
-                button_label = f"{prefix}{icon}\n{drug}"
-                if cols[j].button(button_label, key=f"drug_btn_{drug}"):
-                    st.session_state.selected_drug = drug
 
+    with st.expander("💊 Select a drug"):
+        # Top row: inotropes + other normal drugs (exclude "Other")
+        top_drugs = TIME_MANDATORY_DRUGS + [d for d in DRUGS.keys() if d not in TIME_MANDATORY_DRUGS]
+        cols = st.columns(len(top_drugs), gap="small")
+
+        for j, drug in enumerate(top_drugs):
+            if drug in TIME_MANDATORY_DRUGS:
+                icon = "🔴"
+                font_size = "12px"
+            elif DRUGS.get(drug, {}).get("type") == "sedative":
+                icon = "🟢"
+                font_size = "10px"
+            elif DRUGS.get(drug, {}).get("type") == "muscle_relaxant":
+                icon = "🔵"
+                font_size = "10px"
+            else:
+                icon = "✨"
+                font_size = "10px"
+            prefix = "✅ " if st.session_state.selected_drug == drug else ""
+
+            button_html = f"""
+            <form action="" method="post">
+            <button style="
+                display:flex;
+                justify-content:center;
+                align-items:center;
+                height:50px;
+                width:50px;
+                border-radius:50%;
+                font-size:{font_size};
+                text-align:center;
+                white-space:normal;
+                flex-direction:column;
+                border: 1px solid #ccc;
+                margin:auto;
+                padding:2px;
+                background-color:#f0f0f0;
+                cursor:pointer;">
+                {prefix}{icon}<br>{drug}
+            </button>
+            <input type="hidden" name="selected_drug" value="{drug}">
+            </form>
+            """
+            cols[j].markdown(button_html, unsafe_allow_html=True)
+
+        # Bottom row: "Other" big square
+        st.markdown("<br>", unsafe_allow_html=True)
+        other_drug = "Other"
+        prefix = "✅ " if st.session_state.selected_drug == other_drug else ""
+        other_html = f"""
+        <form action="" method="post">
+        <button style="
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            height:80px;
+            width:80px;
+            border-radius:15px;
+            font-size:16px;
+            text-align:center;
+            white-space:normal;
+            flex-direction:column;
+            border: 2px solid #666;
+            margin:auto;
+            padding:5px;
+            background-color:#ffe680;
+            cursor:pointer;">
+            {prefix}✨<br>{other_drug}
+        </button>
+        <input type="hidden" name="selected_drug" value="{other_drug}">
+        </form>
+        """
+        st.markdown(other_html, unsafe_allow_html=True)
+
+    # Selected drug info
     if st.session_state.selected_drug:
         drug = st.session_state.selected_drug
         st.subheader(f"Selected Drug: {drug}")
-        drug_name = st.text_input("Medication name:", value=drug if drug!="Other" else "", key="A_other_name")
+        drug_name = st.text_input("Medication name:", value=drug if drug != "Other" else "", key="A_other_name")
         tip = drug_tips.get(drug.lower(), drug_tips["other"])
         st.info(f"🩺 {tip}")
 
@@ -350,6 +357,102 @@ with tabs[5]:
         st.markdown(f"### 📄 AI-Generated Policy for {fluid}\n{policy_text}")
 
 # =========================
+# 🤖 Nurse Assistant Chat (AI)
+# =========================
+st.markdown("---")
+st.markdown("## 🤖 Nurse Assistant")
+
+# Initialize chat memory
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {
+            "role": "assistant",
+            "content": (
+                "👋 Hello Nurse!\n\n"
+                "I’m your ICU Nurse Assistant.\n"
+                "You can ask me about:\n"
+                "• Medication policies\n"
+                "• Preparation & administration\n"
+                "• ICU safety reminders\n\n"
+                "💡 Example: *How do I administer dopamine safely?*"
+            )
+        }
+    ]
+
+# Clear chat button
+col1, col2 = st.columns([6, 1])
+with col2:
+    if st.button("🧹 Clear", key="clear_chat"):
+        st.session_state.messages = [
+            {
+                "role": "assistant",
+                "content": "👋 Chat cleared. How can I help you?"
+            }
+        ]
+
+# Display chat messages (ChatGPT style)
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# Chat input
+user_prompt = st.chat_input("Type your question… 👩‍⚕️")
+
+if user_prompt:
+    # Show user message
+    st.session_state.messages.append(
+        {"role": "user", "content": user_prompt}
+    )
+    with st.chat_message("user"):
+        st.markdown(user_prompt)
+
+    # Assistant typing indicator
+    with st.chat_message("assistant"):
+        with st.spinner("Nurse Assistant is thinking…"):
+            tip = drug_tips.get(user_prompt.lower(), drug_tips["other"])
+
+            prompt = f"""
+You are an ICU Nurse Assistant.
+
+User question:
+{user_prompt}
+
+Clinical tip (if relevant):
+{tip}
+
+Respond like a real clinical assistant:
+- Clear
+- Professional
+- Nursing-focused
+- Safety-oriented
+
+Do NOT calculate doses.
+Always remind to follow hospital policy and local guidelines.
+"""
+
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "You are a professional ICU nurse assistant."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.3
+                )
+                assistant_reply = response.choices[0].message.content
+            except Exception:
+                assistant_reply = (
+                    "⚠️ I’m unable to respond right now.\n\n"
+                    "Please follow your hospital medication policy."
+                )
+
+            st.markdown(assistant_reply)
+
+    # Save assistant reply
+    st.session_state.messages.append(
+        {"role": "assistant", "content": assistant_reply}
+    )
+
 # Disclaimer
 # =========================
 
@@ -358,6 +461,5 @@ st.markdown(
     "⚠️ This AI assistant is for **educational purposes only**. "
     "Always follow hospital protocols and verify with pharmacology manuals."
 )
-
 
 
