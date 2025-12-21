@@ -1,14 +1,13 @@
 
-from openai import OpenAI
 import streamlit as st
-
-client = OpenAI(
-    api_key=st.secrets["OPENAI_API_KEY"]
-)
+from openai import OpenAI
+import os
 
 
-
-
+# OpenAI Setup
+# =========================
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai = client   
 
 # =========================
 # App Config
@@ -67,22 +66,12 @@ Explain clearly how this result is interpreted clinically.
 Mention safety considerations.
 Do NOT use formulas or code.
 """
-   response = client.responses.create(
-    model="gpt-4o-mini",
-    input=[
-        {
-            "role": "system",
-            "content": "You are a professional ICU nurse assistant."
-        },
-        {
-            "role": "user",
-            "content": prompt
-        }
-    ]
-)
-
-assistant_reply = response.output_text
-
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.0
+    )
+    return response.choices[0].message.content
 
 
 def generate_med_policy(drug_name):
@@ -462,7 +451,5 @@ st.markdown(
     "⚠️ This AI assistant is for **educational purposes only**. "
     "Always follow hospital protocols and verify with pharmacology manuals."
 )
-
-
 
 
