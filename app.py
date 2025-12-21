@@ -3,11 +3,13 @@ import streamlit as st
 from openai import OpenAI
 import os
 
-
-# OpenAI Setup
 # =========================
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-openai = client   # ✅ FIX: allows openai.ChatCompletion.create() to work
+# OpenAI Setup (CORRECT)
+# =========================
+client = OpenAI(
+    api_key=st.secrets["OPENAI_API_KEY"]
+)
+
 
 
 
@@ -453,5 +455,6 @@ st.markdown(
     "⚠️ This AI assistant is for **educational purposes only**. "
     "Always follow hospital protocols and verify with pharmacology manuals."
 )
+
 
 
