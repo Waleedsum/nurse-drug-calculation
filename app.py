@@ -1,13 +1,10 @@
 
+import os
 import streamlit as st
 from openai import OpenAI
-import os
 
-
-# OpenAI Setup
-# =========================
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-openai = client   
+api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
+client = OpenAI(api_key=api_key)
 
 # =========================
 # App Config
