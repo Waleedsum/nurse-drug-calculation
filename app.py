@@ -47,7 +47,7 @@ drug_tips = {
     "propofol": "Use 2 ampules (400 mg) = 40 ml in a 50 mL syringe.",
     "midazolam": "Use 3 ampules (45 mg): 9 mL drug + 36 mL NS → total 45 mg in 45 mL.",
     "rocuronium": "Ensure adequate sedation before paralysis. Use 5 ampules = 250 mg in 50 mL.",
-    "esmron": "Same preparation as Rocuronium.",
+    "esmron": "Same preparation as Rocuronium. Ensure adequate sedation before paralysis. Use 5 ampules = 250 mg in 50 mL.",
     "atracurium": "Watch for hypotension and histamine release. Use 4 ampules (100 mg) + 40 mL NS.",
     "other": "Ensure dose and stock use the same units.",
     "Caution": "🛑Always follow up your hospital policies and procedures🛑"
@@ -140,108 +140,93 @@ tabs = st.tabs([
     "E – IV rate drip",
     "F – IV rate Pump"
 ])
-
-# ---- Tabs A–F
 # --- Tab A – ICU Infusions ---
 with tabs[0]:
     st.header("A – ICU Infusions")
+
+    # -------------------------
+    # Session state
+    # -------------------------
     if "selected_drug" not in st.session_state:
         st.session_state.selected_drug = None
+    if "drug_name" not in st.session_state:
+        st.session_state.drug_name = ""
 
-    with st.expander("💊 Select a drug"):
-        # Top row: inotropes + other normal drugs (exclude "Other")
-        top_drugs = TIME_MANDATORY_DRUGS + [d for d in DRUGS.keys() if d not in TIME_MANDATORY_DRUGS]
-        cols = st.columns(len(top_drugs), gap="small")
+    # -------------------------
+    # Drug grid
+    # -------------------------
+    drugs = TIME_MANDATORY_DRUGS + [d for d in DRUGS if d not in TIME_MANDATORY_DRUGS] + ["Other"]
+    max_cols = 4
+    rows = [drugs[i:i + max_cols] for i in range(0, len(drugs), max_cols)]
 
-        for j, drug in enumerate(top_drugs):
+    for row in rows:
+        cols = st.columns(len(row), gap="small")
+        for i, drug in enumerate(row):
+            # Assign icon and color
             if drug in TIME_MANDATORY_DRUGS:
-                icon = "🔴"
-                font_size = "12px"
+                icon, bg_color = "🔴", "#ffcccc"
             elif DRUGS.get(drug, {}).get("type") == "sedative":
-                icon = "🟢"
-                font_size = "10px"
+                icon, bg_color = "🟢", "#ccffcc"
             elif DRUGS.get(drug, {}).get("type") == "muscle_relaxant":
-                icon = "🔵"
-                font_size = "10px"
+                icon, bg_color = "🔵", "#cce0ff"
+            elif drug == "Other":
+                icon, bg_color = "✨", "#ffe680"
             else:
-                icon = "✨"
-                font_size = "10px"
-            prefix = "✅ " if st.session_state.selected_drug == drug else ""
+                icon, bg_color = "✨", "#f0f0f0"
 
-            button_html = f"""
-            <form action="" method="post">
-            <button style="
-                display:flex;
-                justify-content:center;
-                align-items:center;
-                height:50px;
-                width:50px;
-                border-radius:50%;
-                font-size:{font_size};
-                text-align:center;
-                white-space:normal;
-                flex-direction:column;
-                border: 1px solid #ccc;
-                margin:auto;
-                padding:2px;
-                background-color:#f0f0f0;
-                cursor:pointer;">
-                {prefix}{icon}<br>{drug}
-            </button>
-            <input type="hidden" name="selected_drug" value="{drug}">
-            </form>
-            """
-            cols[j].markdown(button_html, unsafe_allow_html=True)
+            border = "3px solid #444" if st.session_state.selected_drug == drug else "1px solid #ccc"
+            style = f"background-color:{bg_color};border:{border};padding:8px;text-align:center;border-radius:8px;"
+            if cols[i].button(f"{icon} {drug}", key=f"btn_{drug}"):
+                st.session_state.selected_drug = drug
+                st.session_state.drug_name = "" if drug == "Other" else drug
 
-        # Bottom row: "Other" big square
-        st.markdown("<br>", unsafe_allow_html=True)
-        other_drug = "Other"
-        prefix = "✅ " if st.session_state.selected_drug == other_drug else ""
-        other_html = f"""
-        <form action="" method="post">
-        <button style="
-            display:flex;
-            justify-content:center;
-            align-items:center;
-            height:80px;
-            width:80px;
-            border-radius:15px;
-            font-size:16px;
-            text-align:center;
-            white-space:normal;
-            flex-direction:column;
-            border: 2px solid #666;
-            margin:auto;
-            padding:5px;
-            background-color:#ffe680;
-            cursor:pointer;">
-            {prefix}✨<br>{other_drug}
-        </button>
-        <input type="hidden" name="selected_drug" value="{other_drug}">
-        </form>
-        """
-        st.markdown(other_html, unsafe_allow_html=True)
-
-    # Selected drug info
+    # -------------------------
+    # Selected drug logic
+    # -------------------------
     if st.session_state.selected_drug:
         drug = st.session_state.selected_drug
-        st.subheader(f"Selected Drug: {drug}")
-        drug_name = st.text_input("Medication name:", value=drug if drug != "Other" else "", key="A_other_name")
-        tip = drug_tips.get(drug.lower(), drug_tips["other"])
-        st.info(f"🩺 {tip}")
 
-        # Dose inputs for ICU Infusions
+        # ---- Link tips correctly ----
+        tip_key_map = {
+            "Dopamine": "dopamine",
+            "Dobutamine": "dobutamine",
+            "Epinephrine": "epinephrine",
+            "Fentanyl": "fentanyl",
+            "Propofol": "propofol",
+            "Midazolam": "midazolam",
+            "Esmron or Rocuronium": "esmron",
+            "Atracurium": "atracurium",
+            "Other": "other"
+        }
+        tip_key = tip_key_map.get(drug, "other")
+        tip = drug_tips.get(tip_key, "No tip available")
+        st.info(f"🩺 Tip: {tip}")
+
+        # ---- Other drug: editable name ----
+        if drug == "Other":
+            st.session_state.drug_name = st.text_input("Medication name:", value=st.session_state.drug_name, key="A_other_name")
+
+        drug_name = st.session_state.drug_name or drug
+
+        # =========================
+        # CALCULATOR
+        # =========================
         if drug in TIME_MANDATORY_DRUGS:
             dose = st.number_input("Dose (mcg/kg/min)", min_value=0.0, key="A_i_dose")
             weight = st.number_input("Weight (kg)", min_value=0.0, key="A_i_weight")
             stock = st.number_input("Stock (mg)", min_value=0.1, key="A_i_stock")
             volume = st.number_input("Dilution volume (mL)", min_value=1.0, key="A_i_volume")
             time_min = st.number_input("Time (minutes) *required*", min_value=1.0, key="A_i_time")
+
             if st.button("Calculate ICU Infusion", key="A_i_calc"):
-                result, unit = calculate_infusion(drug, dose, weight, stock, volume, time_min)
-                if result:
-                    st.success(f"{result} {unit}")
-                    st.markdown(ask_ai(drug_name, f"{result} {unit}", tip, "Inotrope infusion"))
+                if not drug_name.strip():
+                    st.warning("Please enter the medication name.")
+                else:
+                    result, unit = calculate_infusion(drug, dose, weight, stock, volume, time_min)
+                    if result:
+                        st.success(f"{result} {unit}")
+                        st.markdown(ask_ai(drug_name, f"{result} {unit}", tip, "Inotrope infusion"))
+
         else:
             dose = st.number_input("Dose", min_value=0.0, key="A_o_dose")
             dose_unit = st.selectbox("Dose unit", ["mg", "mcg", "IU"], key="A_o_dose_unit")
@@ -250,22 +235,29 @@ with tabs[0]:
             stock_unit = st.selectbox("Stock unit", ["mg", "mcg", "IU"], key="A_o_stock_unit")
             volume = st.number_input("Dilution volume (mL)", min_value=1.0, key="A_o_volume")
             time_min = st.number_input("Time (minutes) – optional", min_value=0.0, value=0.0, key="A_o_time")
+
             # Unit conversion
             if dose_unit == "mg" and stock_unit == "mcg": dose *= 1000
             if dose_unit == "mcg" and stock_unit == "mg": stock *= 1000
-            if st.button("Calculate ICU Infusion", key="A_o_calc"):
-                result, unit = calculate_infusion(drug, dose, weight if weight>0 else None, stock, volume, time_min)
-                if result:
-                    st.success(f"{result} {unit}")
-                    st.markdown(ask_ai(drug_name, f"{result} {unit}", tip, "ICU infusion"))
 
-        # AI Policy button
-        if st.button("Generate AI Medication Policy", key=f"A_policy_{drug_name}"):
-            policy_text = explain_med_policy(drug_name)
-            st.markdown(f"### 📄 AI-Generated Policy for {drug_name}\n{policy_text}")
+            if st.button("Calculate ICU Infusion (Other)"):
+                if drug == "Other" and not drug_name.strip():
+                    st.warning("Please enter the medication name.")
+                else:
+                    result, unit = calculate_infusion(drug, dose, weight if weight>0 else None, stock, volume, time_min)
+                    if result:
+                        st.success(f"{result} {unit}")
+                        st.markdown(ask_ai(drug_name, f"{result} {unit}", tip, "ICU infusion"))
 
-# --- Tabs B–F (Parenteral, Oral, Tablets, IV Gravity, IV Pump) follow the same pattern ---
-# Each tab: input fields → calculate → display result → AI Policy button
+        # =========================
+        # AI Medication Policy
+        # =========================
+        if st.button("Generate AI Medication Policy"):
+            if drug == "Other" and not drug_name.strip():
+                st.warning("Please enter the medication name.")
+            else:
+                policy_text = generate_med_policy(drug_name)
+                st.markdown(f"### 📄 AI-Generated Policy for {drug_name}\n{policy_text}")
 
 # Tab B – Parenteral
 with tabs[1]:
@@ -396,7 +388,7 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 # Chat input
-user_prompt = st.chat_input("Type your question… 👩‍⚕️")
+user_prompt = st.chat_input("Type your question or select from the list (A to F)… 👩‍⚕️")
 
 if user_prompt:
     # Show user message
