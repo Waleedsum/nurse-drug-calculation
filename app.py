@@ -146,35 +146,33 @@ with tabs[0]:
         st.session_state.selected_drug = None
     if "drug_name" not in st.session_state:
         st.session_state.drug_name = ""
+ # -------------------------
+    with st.expander("💊 Select ICU Infusion Drug (💉)"):
+        drugs = TIME_MANDATORY_DRUGS + [d for d in DRUGS if d not in TIME_MANDATORY_DRUGS] + ["Other"]
+        max_cols = 4
+        rows = [drugs[i:i + max_cols] for i in range(0, len(drugs), max_cols)]
 
-    # -------------------------
-    # Drug grid
-    # -------------------------
-    drugs = TIME_MANDATORY_DRUGS + [d for d in DRUGS if d not in TIME_MANDATORY_DRUGS] + ["Other"]
-    max_cols = 4
-    rows = [drugs[i:i + max_cols] for i in range(0, len(drugs), max_cols)]
+        for row in rows:
+            cols = st.columns(len(row), gap="small")
+            for col, drug in zip(cols, row):
+                # Assign icon and color
+                if drug in TIME_MANDATORY_DRUGS:
+                    icon, bg_color = "🔴", "#ffcccc"
+                elif DRUGS.get(drug, {}).get("type") == "sedative":
+                    icon, bg_color = "🟢", "#ccffcc"
+                elif DRUGS.get(drug, {}).get("type") == "muscle_relaxant":
+                    icon, bg_color = "🔵", "#cce0ff"
+                elif drug == "Other":
+                    icon, bg_color = "✨", "#ffe680"
+                else:
+                    icon, bg_color = "✨", "#f0f0f0"
 
-    for row in rows:
-        cols = st.columns(len(row), gap="small")
-        for i, drug in enumerate(row):
-            # Assign icon and color
-            if drug in TIME_MANDATORY_DRUGS:
-                icon, bg_color = "🔴", "#ffcccc"
-            elif DRUGS.get(drug, {}).get("type") == "sedative":
-                icon, bg_color = "🟢", "#ccffcc"
-            elif DRUGS.get(drug, {}).get("type") == "muscle_relaxant":
-                icon, bg_color = "🔵", "#cce0ff"
-            elif drug == "Other":
-                icon, bg_color = "✨", "#ffe680"
-            else:
-                icon, bg_color = "✨", "#f0f0f0"
+                border = "3px solid #444" if st.session_state.selected_drug == drug else "1px solid #ccc"
+                style = f"background-color:{bg_color};border:{border};padding:8px;text-align:center;border-radius:8px;"
 
-            border = "3px solid #444" if st.session_state.selected_drug == drug else "1px solid #ccc"
-            style = f"background-color:{bg_color};border:{border};padding:8px;text-align:center;border-radius:8px;"
-            if cols[i].button(f"{icon} {drug}", key=f"btn_{drug}"):
-                st.session_state.selected_drug = drug
-                st.session_state.drug_name = "" if drug == "Other" else drug
-
+                if col.button(f"{icon} {drug}", key=f"btn_{drug}"):
+                    st.session_state.selected_drug = drug
+                    st.session_state.drug_name = "" if drug == "Other" else drug
     # -------------------------
     # Selected drug logic
     # -------------------------
@@ -448,5 +446,6 @@ st.markdown(
     "⚠️ This AI assistant is for **educational purposes only**. "
     "Always follow hospital protocols and verify with pharmacology manuals."
 )
+
 
 
