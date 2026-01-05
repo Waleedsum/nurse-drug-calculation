@@ -1,5 +1,5 @@
-
 import os
+from pathlib import Path
 import streamlit as st
 from openai import OpenAI
 
@@ -17,6 +17,22 @@ st.set_page_config(
 st.title("💊 AI Drug Calculator 👩‍🚀")
 st.markdown("**Educational use only – follow hospital protocols**")
 st.markdown("---")
+
+#Hospital policy =========================
+from pathlib import Path
+
+POLICY_DIR = Path("policies")
+
+HOSPITAL_POLICIES = {
+    "MM 5.4": {
+        "title": "STANDARD INTRAVENOUS DRUG CONCENTRATION FOR ADULT ICU AND ER RESUSCITATION",
+        "pdf": POLICY_DIR / "MM_5_4_ICU_IV_Policy.pdf"
+    },
+    "MM-36": {
+        "title": "SAFE SYSTEM FOR DRUG ADMINISTRATION",
+        "pdf": POLICY_DIR / "MM_36_Safe_Drug_Administration.pdf"
+    }
+}
 
 # =========================
 # Drug Database
@@ -133,8 +149,14 @@ tabs = st.tabs([
     "C – Oral",
     "D – Tablets",
     "E – IV rate drip",
-    "F – IV rate Pump"
+    "F – IV rate Pump",
+    "G - Hospital Policy"
 ])
+# Acknowledge checkbox
+ack = st.checkbox("✅ I acknowledge and will comply with hospital medication policies")
+if not ack:
+    st.warning("⚠️ Please acknowledge policy compliance to view documents.")
+    st.stop()
 # --- Tab A – ICU Infusions ---
 with tabs[0]:
     st.header("A – ICU Infusions")
@@ -146,7 +168,10 @@ with tabs[0]:
         st.session_state.selected_drug = None
     if "drug_name" not in st.session_state:
         st.session_state.drug_name = ""
- # -------------------------
+
+    # -------------------------
+    # Drug grid inside an expander
+    # -------------------------
     with st.expander("💊 Select ICU Infusion Drug (💉)"):
         drugs = TIME_MANDATORY_DRUGS + [d for d in DRUGS if d not in TIME_MANDATORY_DRUGS] + ["Other"]
         max_cols = 4
@@ -173,6 +198,7 @@ with tabs[0]:
                 if col.button(f"{icon} {drug}", key=f"btn_{drug}"):
                     st.session_state.selected_drug = drug
                     st.session_state.drug_name = "" if drug == "Other" else drug
+
     # -------------------------
     # Selected drug logic
     # -------------------------
@@ -222,10 +248,10 @@ with tabs[0]:
 
         else:
             dose = st.number_input("Dose", min_value=0.0, key="A_o_dose")
-            dose_unit = st.selectbox("Dose unit", ["mg", "mcg", "IU"], key="A_o_dose_unit")
+            dose_unit = st.selectbox("Dose unit", ["mg", "mcg", "IU","mEq","mmol"], key="A_o_dose_unit")
             weight = st.number_input("Weight (kg) – optional", min_value=0.0, value=0.0, key="A_o_weight")
             stock = st.number_input("Stock", min_value=0.1, key="A_o_stock")
-            stock_unit = st.selectbox("Stock unit", ["mg", "mcg", "IU"], key="A_o_stock_unit")
+            stock_unit = st.selectbox("Stock unit", ["mg", "mcg", "IU","mEq","mmol"], key="A_o_stock_unit")
             volume = st.number_input("Dilution volume (mL)", min_value=1.0, key="A_o_volume")
             time_min = st.number_input("Time (minutes) – optional", min_value=0.0, value=0.0, key="A_o_time")
 
@@ -342,6 +368,41 @@ with tabs[5]:
         st.markdown(f"### 📄 AI-Generated Policy for {fluid}\n{policy_text}")
 
 # =========================
+# Tab G – Hospital Policies (PDF)
+# =========================
+# =========================
+# Tab G – Hospital Policies (PDF)
+# =========================
+with tabs[6]:
+    st.header("🏥 Hospital Medication Policies")
+    st.markdown(
+        """
+        ✅ **Official hospital policies are provided as PDF documents only.**  
+        🔒 PDFs are the **source of truth** and must be followed at all times.  
+        🤖 AI guidance is **supportive only** and does not replace policy.
+        """
+    )
+
+    # Iterate through all policies (no search)
+    for policy_no, policy in HOSPITAL_POLICIES.items():
+        title = policy.get("title", "")
+        pdf_path = policy.get("pdf")  # ensure HOSPITAL_POLICIES has 'pdf' key
+
+        with st.expander(f"{policy_no} – {title}"):
+            if pdf_path and pdf_path.exists():
+                with open(pdf_path, "rb") as f:
+                    st.download_button(
+                        label="⬇️ Download PDF",
+                        data=f,
+                        file_name=pdf_path.name,
+                        mime="application/pdf"
+                    )
+            else:
+                st.error("❌ PDF not available. Contact pharmacy or administration.")
+
+
+
+# =========================
 # 🤖 Nurse Assistant Chat (AI)
 # =========================
 st.markdown("---")
@@ -381,7 +442,7 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 # Chat input
-user_prompt = st.chat_input("Type your question or select from the list (A to F)… 👩‍⚕️")
+user_prompt = st.chat_input("Type your question or select from the list (A to G)… 👩‍⚕️")
 
 if user_prompt:
     # Show user message
