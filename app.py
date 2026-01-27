@@ -127,7 +127,16 @@ def calculate_parenteral(dose, stock, volume, weight=None):
 def calculate_oral(dose, stock, volume, weight=None):
     return (dose * weight / stock) * volume if weight else (dose / stock) * volume
 
-def calculate_tablet(dose, stock):
+def calculate_tablet(dose, stock, dose_unit="mg", stock_unit="mg"):
+    if dose <= 0 or stock <= 0:
+        return None
+
+    # Convert grams → mg if needed
+    if dose_unit.lower() == "g":
+        dose *= 1000
+    if stock_unit.lower() == "g":
+        stock *= 1000
+
     return dose / stock
 
 def calculate_iv_gravity(volume, drop_factor, time_value, time_unit="minutes"):
@@ -317,18 +326,31 @@ with tabs[2]:
         st.markdown(f"### 📄 AI-Generated Policy for {med}\n{policy_text}")
 
 # Tab D – Tablets
+
 with tabs[3]:
     st.header("D – Tablets / Capsules")
+
     med = st.text_input("Medication name:", key="Dmed")
     tip = drug_tips.get(med.lower(), "Follow tablet administration guidelines.")
-    dose = st.number_input("Prescribed dose:", 0.0, key="Ddose")
-    stock = st.number_input("Tablet strength:", 0.1, 50.0, key="Dstock")
-    unit = st.text_input("Unit (mg/g):", "mg", key="Dunit")
+
+    dose = st.number_input("Prescribed dose:", min_value=0.0, key="Ddose")
+    dose_unit = st.selectbox("Dose unit:", ["mg", "g"], key="Ddose_unit")
+
+    stock = st.number_input("Tablet strength:", min_value=0.1, key="Dstock")
+    stock_unit = st.selectbox("Tablet strength unit:", ["mg", "g"], key="Dstock_unit")
+
     if st.button("Calculate Tablets", key="D_calc"):
-        result = calculate_tablet(dose, stock)
-        if result:
-            st.success(f"{med}: {result:.2f} tablet(s) [{unit}]")
+        result = calculate_tablet(dose, stock, dose_unit, stock_unit)
+
+        if result is not None:
+            st.success(f"{med}: {result:.2f} tablet(s) needed")
+            st.caption(f"Each tablet contains {stock} {stock_unit}")
+
+            if result % 1 != 0:
+                st.warning("⚠️ Fractional tablets — verify tablet is safe to split/crush per hospital policy.")
+
             st.markdown(ask_ai(med, f"{result:.2f} tablets", tip, "Tablet calculation"))
+
     if st.button("Generate AI Medication Policy", key="D_policy"):
         policy_text = generate_med_policy(med)
         st.markdown(f"### 📄 AI-Generated Policy for {med}\n{policy_text}")
@@ -507,6 +529,7 @@ st.markdown(
     "⚠️ This AI assistant is for **educational purposes only**. "
     "Always follow hospital protocols and verify with pharmacology manuals."
 )
+
 
 
 
